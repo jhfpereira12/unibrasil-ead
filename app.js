@@ -1,10 +1,13 @@
 /**
  * ============================================================================
- * PORTAL ACADÊMICO EAD - PARCEIRO OFICIAL UNICV
+ * PORTAL NACIONAL EDUBRASIL EAD - PARCEIRO OFICIAL UNICV
  * ARQUIVO: app.js
- * Regras de Negócio, Filtros Reativos, Simulador e Integração WhatsApp
+ * Lógica de Negócio, Filtros Reativos, Simulador e Integração WhatsApp
  * ============================================================================
  */
+
+// Configuração do WhatsApp Oficial da Secretaria Acadêmica
+const WHATSAPP_NUMERO = "5513999999999";
 
 (function () {
   "use strict";
@@ -14,12 +17,11 @@
     modalidadeAtiva: "tec-para-tecnologo",
     termoBusca: "",
     cursoSelecionado: null,
-    isRegionalBaixada: false,
-    dadosRegionais: null
+    isRegionalBaixada: false
   };
 
   /**
-   * Utilitário: Escapa strings para inserção segura no HTML
+   * Utilitário: Escapa texto para inserção segura no DOM
    */
   function escapeHTML(str) {
     if (!str) return "";
@@ -33,13 +35,11 @@
 
   /**
    * 1. PERSONALIZAÇÃO REGIONAL POR QUERY PARAMS (?regiao=baixada)
-   * Analisa a URL e adapta dinamicamente as mensagens do portal
    */
   function aplicarPersonalizacaoRegional() {
     const urlParams = new URLSearchParams(window.location.search);
     const regiaoParam = (urlParams.get("regiao") || "").toLowerCase().trim();
 
-    // Verifica se o parâmetro indica Baixada Santista
     const isBaixada = [
       "baixada",
       "baixada-santista",
@@ -53,62 +53,72 @@
     ].includes(regiaoParam);
 
     state.isRegionalBaixada = isBaixada;
-    state.dadosRegionais = isBaixada
-      ? window.INSTITUCIONAL_CONFIG.regionalizacao.baixada
-      : window.INSTITUCIONAL_CONFIG.regionalizacao.nacional;
 
-    // Atualiza elementos da interface
-    const heroTag = document.getElementById("hero-tag-regiao");
-    const heroTitle = document.getElementById("hero-title");
-    const heroSubtitle = document.getElementById("hero-subtitle");
-    const topbarBadge = document.getElementById("topbar-regiao-badge");
-    const footerTexto = document.getElementById("footer-regiao-texto");
+    const heroBadge = document.getElementById("hero-badge");
+    const topbarRegiao = document.getElementById("topbar-regiao");
+    const footerRegiao = document.getElementById("footer-regiao-texto");
     const inputCidade = document.getElementById("form-cidade");
 
-    if (heroTag) heroTag.textContent = state.dadosRegionais.tagRegiao;
-    if (heroTitle) heroTitle.textContent = state.dadosRegionais.tituloHero;
-    if (heroSubtitle) heroSubtitle.textContent = state.dadosRegionais.subtituloHero;
-    if (topbarBadge) topbarBadge.textContent = isBaixada ? "Polo Baixada Santista" : "Atendimento Nacional";
-    if (footerTexto) footerTexto.textContent = state.dadosRegionais.destaquePolo;
-
-    // Pré-preenche o campo de cidade no formulário se for a região Baixada
-    if (inputCidade && isBaixada) {
-      inputCidade.value = state.dadosRegionais.cidadePadrao;
+    if (isBaixada) {
+      if (heroBadge) {
+        heroBadge.innerHTML = `<i class="fa-solid fa-map-location-dot text-emerald-400 mr-1.5"></i> Polo Autorizado Baixada Santista • Santos, Guarujá e Região`;
+      }
+      if (topbarRegiao) {
+        topbarRegiao.innerHTML = `<i class="fa-solid fa-location-dot text-[10px] text-emerald-400 mr-1"></i> Polo Baixada Santista`;
+      }
+      if (footerRegiao) {
+        footerRegiao.innerHTML = `<i class="fa-solid fa-map-pin mr-1 text-emerald-400"></i> Polo de Apoio Autorizado: Atendimento exclusivo em Santos, Guarujá, Cubatão e Região.`;
+      }
+      if (inputCidade && !inputCidade.value) {
+        inputCidade.value = "Guarujá / Santos e Baixada Santista - SP";
+      }
+    } else {
+      if (heroBadge) {
+        heroBadge.innerHTML = `<i class="fa-solid fa-bullhorn text-emerald-400 mr-1.5"></i> Polo Oficial UniCV • Atendimento Universitário em Todo o Brasil`;
+      }
+      if (topbarRegiao) {
+        topbarRegiao.innerHTML = `<i class="fa-solid fa-location-dot text-[10px] text-emerald-400 mr-1"></i> Atendimento Nacional`;
+      }
+      if (footerRegiao) {
+        footerRegiao.innerHTML = `<i class="fa-solid fa-map-pin mr-1 text-emerald-400"></i> Atendimento e polos parceiros em todo o território nacional.`;
+      }
     }
   }
 
   /**
-   * 2. RENDERIZAÇÃO DO CATÁLOGO DE CURSOS E FILTROS
+   * 2. RENDERIZAÇÃO DO CATÁLOGO DE CURSOS E ABAS
    */
   function atualizarContadoresAbas() {
-    Object.keys(window.MODALIDADES).forEach((key) => {
+    if (!window.dadosModalidades) return;
+    Object.keys(window.dadosModalidades).forEach((key) => {
       const el = document.getElementById(`count-${key}`);
-      if (el && window.CURSOS_DATABASE[key]) {
-        el.textContent = window.CURSOS_DATABASE[key].length;
+      const mod = window.dadosModalidades[key];
+      if (el && mod && mod.cursos) {
+        el.textContent = mod.cursos.length;
       }
     });
   }
 
-  function atualizarBannerModalidade() {
-    const banner = document.getElementById("banner-modalidade-ativa");
-    if (!banner) return;
+  function atualizarBoxModalidade() {
+    const box = document.getElementById("box-modalidade");
+    if (!box || !window.dadosModalidades) return;
 
-    const modalidade = window.MODALIDADES[state.modalidadeAtiva];
+    const modalidade = window.dadosModalidades[state.modalidadeAtiva];
     if (!modalidade) return;
 
-    banner.innerHTML = `
+    box.innerHTML = `
       <div class="space-y-1">
         <div class="flex items-center gap-2">
-          <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${modalidade.badgeClass}">
+          <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-black border ${modalidade.badgeClass}">
             ${escapeHTML(modalidade.tag)}
           </span>
-          <h3 class="text-base sm:text-lg font-bold text-slate-900">${escapeHTML(modalidade.nome)}</h3>
+          <h3 class="text-base sm:text-lg font-black text-slate-900">${escapeHTML(modalidade.nome)}</h3>
         </div>
         <p class="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">${escapeHTML(modalidade.descricao)}</p>
       </div>
       <div class="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200">
-        <span class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Tempo Médio:</span>
-        <span class="text-sm font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">${escapeHTML(modalidade.tempoMedio)}</span>
+        <span class="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Tempo Médio:</span>
+        <span class="text-sm font-black text-brand-green bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">${escapeHTML(modalidade.tempoMedio)}</span>
       </div>
     `;
   }
@@ -118,9 +128,9 @@
     botoes.forEach((btn) => {
       const id = btn.id.replace("tab-", "");
       if (id === state.modalidadeAtiva) {
-        btn.className = "tab-btn px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all border flex items-center gap-2 bg-emerald-700 text-white border-emerald-700 shadow-md";
+        btn.className = "tab-btn px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all border flex items-center gap-2 bg-brand-green text-white border-brand-green shadow-md";
         const badge = btn.querySelector("span:last-child");
-        if (badge) badge.className = "text-xs bg-emerald-800 text-emerald-100 px-2 py-0.5 rounded-full";
+        if (badge) badge.className = "text-xs bg-emerald-900 text-emerald-100 px-2 py-0.5 rounded-full";
       } else {
         btn.className = "tab-btn px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all border flex items-center gap-2 bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50";
         const badge = btn.querySelector("span:last-child");
@@ -130,27 +140,27 @@
   }
 
   function filtrarCursos() {
-    const listaCursos = window.CURSOS_DATABASE[state.modalidadeAtiva] || [];
+    if (!window.dadosModalidades) return [];
+    const mod = window.dadosModalidades[state.modalidadeAtiva];
+    const listaCursos = mod ? mod.cursos : [];
     const termo = state.termoBusca.toLowerCase().trim();
 
-    if (!termo) {
-      return listaCursos;
-    }
+    if (!termo) return listaCursos;
 
     return listaCursos.filter((curso) => {
       const nomeMatch = curso.nome.toLowerCase().includes(termo);
       const areaMatch = curso.area.toLowerCase().includes(termo);
       const descMatch = (curso.descricaoCurta || "").toLowerCase().includes(termo);
-      const disciplinaMatch = curso.disciplinas.some((disc) =>
-        disc.toLowerCase().includes(termo)
+      const disciplinaMatch = (curso.disciplinas || []).some((d) =>
+        d.toLowerCase().includes(termo)
       );
       return nomeMatch || areaMatch || descMatch || disciplinaMatch;
     });
   }
 
-  function renderizarCardsCursos() {
+  function renderizarCursos() {
     const grid = document.getElementById("grid-cursos");
-    const emptyState = document.getElementById("empty-state-cursos");
+    const emptyState = document.getElementById("empty-state");
     if (!grid) return;
 
     const cursosFiltrados = filtrarCursos();
@@ -163,28 +173,27 @@
 
     if (emptyState) emptyState.classList.add("hidden");
 
-    const modalidadeInfo = window.MODALIDADES[state.modalidadeAtiva];
+    const modalidadeInfo = window.dadosModalidades[state.modalidadeAtiva];
 
     grid.innerHTML = cursosFiltrados
       .map((curso) => {
-        // Exibe as 3 primeiras disciplinas no card
-        const disciplinasPrev = curso.disciplinas.slice(0, 3);
+        const top3Disciplinas = (curso.disciplinas || []).slice(0, 3);
 
         return `
           <div class="bg-white rounded-2xl border border-slate-200 hover:border-emerald-500 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden group">
             
-            <!-- Topo do Card -->
+            <!-- Conteúdo Superior do Card -->
             <div class="p-6">
               <div class="flex items-center justify-between gap-2 mb-3">
-                <span class="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${modalidadeInfo ? modalidadeInfo.badgeClass : 'bg-slate-100 text-slate-700'}">
+                <span class="inline-block text-[11px] font-black px-2.5 py-0.5 rounded-full border ${modalidadeInfo ? modalidadeInfo.badgeClass : 'bg-slate-100 text-slate-700'}">
                   ${escapeHTML(curso.area)}
                 </span>
-                <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                  ${escapeHTML(curso.duracao)}
+                <span class="text-xs font-extrabold text-brand-green bg-emerald-50 px-2 py-0.5 rounded-md">
+                  <i class="fa-regular fa-clock mr-1 text-[11px]"></i>${escapeHTML(curso.duracao)}
                 </span>
               </div>
 
-              <h3 class="text-lg font-black text-slate-900 group-hover:text-emerald-700 transition-colors leading-snug">
+              <h3 class="text-lg font-black text-slate-900 group-hover:text-brand-green transition-colors leading-snug">
                 ${escapeHTML(curso.nome)}
               </h3>
 
@@ -192,15 +201,15 @@
                 ${escapeHTML(curso.descricaoCurta)}
               </p>
 
-              <!-- Grade Curricular Resumida -->
+              <!-- Grade Curricular Prévia (Top 3) -->
               <div class="mt-4 pt-4 border-t border-slate-100">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Principais Disciplinas:</p>
+                <p class="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2">Principais Disciplinas:</p>
                 <ul class="space-y-1.5">
-                  ${disciplinasPrev
+                  ${top3Disciplinas
                     .map(
                       (d) => `
                     <li class="text-xs text-slate-700 flex items-start gap-1.5">
-                      <svg class="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                      <i class="fa-solid fa-check text-emerald-600 mt-1 text-[11px] flex-shrink-0"></i>
                       <span class="line-clamp-1">${escapeHTML(d)}</span>
                     </li>
                   `
@@ -216,11 +225,11 @@
                 <span>Carga: <strong>${escapeHTML(curso.cargaHoraria)}</strong></span>
               </div>
               <button 
-                onclick="window.appPortal.abrirModalCurso('${escapeHTML(curso.id)}')" 
-                class="px-4 py-2 text-xs font-bold text-white bg-slate-900 group-hover:bg-emerald-700 rounded-xl transition-all shadow-sm hover:shadow flex items-center gap-1.5"
+                onclick="window.appPortal.abrirModal('${escapeHTML(curso.id)}')" 
+                class="px-4 py-2 text-xs font-bold text-white bg-slate-900 group-hover:bg-brand-green rounded-xl transition-all shadow-sm hover:shadow flex items-center gap-1.5"
               >
                 <span>Ver Grade & Matrícula</span>
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
               </button>
             </div>
 
@@ -231,17 +240,17 @@
   }
 
   function selecionarModalidade(modalidadeId, rolarParaCatalogo = false) {
-    if (!window.MODALIDADES[modalidadeId]) return;
+    if (!window.dadosModalidades || !window.dadosModalidades[modalidadeId]) return;
 
     state.modalidadeAtiva = modalidadeId;
     atualizarVisualAbas();
-    atualizarBannerModalidade();
-    renderizarCardsCursos();
+    atualizarBoxModalidade();
+    renderizarCursos();
 
     if (rolarParaCatalogo) {
-      const secaoCatalogo = document.getElementById("catalogo");
-      if (secaoCatalogo) {
-        secaoCatalogo.scrollIntoView({ behavior: "smooth" });
+      const secaoCursos = document.getElementById("cursos");
+      if (secaoCursos) {
+        secaoCursos.scrollIntoView({ behavior: "smooth" });
       }
     }
   }
@@ -249,14 +258,14 @@
   /**
    * 3. LÓGICA DO SIMULADOR DE CONVALIDAÇÃO DE TÉCNICOS
    */
-  function initSimulador() {
-    const select = document.getElementById("select-curso-tecnico");
-    if (!select || !window.SIMULADOR_CONVALIDACAO) return;
+  function inicializarSimulador() {
+    const select = document.getElementById("select-tecnico");
+    if (!select || !window.mapaConvalidacao) return;
 
     select.innerHTML = `
       <option value="">Selecione o seu Curso Técnico Concluído...</option>
-      ${window.SIMULADOR_CONVALIDACAO.map(
-        (item) => `<option value="${escapeHTML(item.tecnicoId)}">${escapeHTML(item.tecnicoNome)}</option>`
+      ${window.mapaConvalidacao.map(
+        (item) => `<option value="${escapeHTML(item.tecnico)}">${escapeHTML(item.tecnico)}</option>`
       ).join("")}
     `;
 
@@ -264,19 +273,19 @@
       atualizarSimulador(this.value);
     });
 
-    // Seleciona o primeiro por padrão para já demonstrar interatividade imediata
-    if (window.SIMULADOR_CONVALIDACAO.length > 0) {
-      select.value = window.SIMULADOR_CONVALIDACAO[0].tecnicoId;
-      atualizarSimulador(window.SIMULADOR_CONVALIDACAO[0].tecnicoId);
+    // Inicia com o primeiro curso técnico para exibição imediata
+    if (window.mapaConvalidacao.length > 0) {
+      select.value = window.mapaConvalidacao[0].tecnico;
+      atualizarSimulador(window.mapaConvalidacao[0].tecnico);
     }
   }
 
-  function atualizarSimulador(tecnicoId) {
-    const container = document.getElementById("container-resultado-simulador");
+  function atualizarSimulador(tecnicoNome) {
+    const container = document.getElementById("resultado-simulador");
     const contador = document.getElementById("contador-simulador");
     if (!container) return;
 
-    if (!tecnicoId) {
+    if (!tecnicoNome) {
       container.innerHTML = `
         <div class="text-center py-8 text-slate-400 text-sm">
           Selecione uma formação técnica acima para simular a convalidação de disciplinas.
@@ -286,64 +295,64 @@
       return;
     }
 
-    const item = window.SIMULADOR_CONVALIDACAO.find((i) => i.tecnicoId === tecnicoId);
+    const item = window.mapaConvalidacao.find((i) => i.tecnico === tecnicoNome);
     if (!item) return;
 
     if (contador) {
-      contador.textContent = `${item.cursosElegiveis.length} formações superiores compatíveis`;
+      contador.textContent = `${item.tecnologosCompativeis.length} formações superiores compatíveis`;
     }
 
-    container.innerHTML = item.cursosElegiveis
-      .map((elegivel) => {
-        return `
-          <div class="p-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-700 text-white">
-                  ⚡ Aproveitamento Garantido
-                </span>
-                <span class="text-xs font-semibold text-slate-500">
-                  Formação estimada em: <strong class="text-emerald-800">${escapeHTML(elegivel.duracaoEstimada)}</strong>
-                </span>
-              </div>
-              <h4 class="text-base font-black text-slate-900">${escapeHTML(elegivel.nome)}</h4>
-              <p class="text-xs text-slate-600">
-                <strong>Equivalência Curricular:</strong> ${escapeHTML(elegivel.aproveitamentoMedio)}.
-              </p>
-              <p class="text-xs text-emerald-800 font-medium">
-                💡 ${escapeHTML(elegivel.vantagem)}
-              </p>
+    container.innerHTML = item.tecnologosCompativeis
+      .map((elegivel) => `
+        <div class="p-5 rounded-2xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-black bg-brand-green text-white">
+                <i class="fa-solid fa-bolt mr-1 text-[10px]"></i> Aproveitamento Garantido
+              </span>
+              <span class="text-xs font-semibold text-slate-600">
+                Conclusão estimada em: <strong class="text-brand-green">${escapeHTML(elegivel.duracao)}</strong>
+              </span>
             </div>
-
-            <div class="flex-shrink-0">
-              <button 
-                onclick="window.appPortal.abrirModalCurso('${escapeHTML(elegivel.cursoId)}')" 
-                class="w-full md:w-auto px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-emerald-700 hover:bg-emerald-800 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
-              >
-                <span>Aproveitar Meu Técnico</span>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-              </button>
-            </div>
+            <h4 class="text-base font-black text-slate-900">${escapeHTML(elegivel.nome)}</h4>
+            <p class="text-xs text-slate-600">
+              <strong>Equivalência Curricular:</strong> ${escapeHTML(elegivel.materiasEliminadas)}.
+            </p>
+            <p class="text-xs text-brand-green font-semibold">
+              <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> ${escapeHTML(elegivel.vantagem)}
+            </p>
           </div>
-        `;
-      })
+
+          <div class="flex-shrink-0">
+            <button 
+              onclick="window.appPortal.abrirModal('${escapeHTML(elegivel.cursoId)}')" 
+              class="w-full md:w-auto px-5 py-2.5 rounded-xl font-black text-xs text-white bg-brand-green hover:bg-brand-greenDark shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+            >
+              <span>Aproveitar Meu Técnico</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      `)
       .join("");
   }
 
   /**
    * 4. MODAL DE SECRETARIA DIGITAL E GRADE CURRICULAR
    */
-  function abrirModalCurso(cursoId) {
+  function abrirModal(cursoId) {
     let curso = null;
     let modalidadeKey = "";
 
     // Procura o curso em todas as modalidades
-    for (const [key, lista] of Object.entries(window.CURSOS_DATABASE)) {
-      const match = lista.find((c) => c.id === cursoId);
-      if (match) {
-        curso = match;
-        modalidadeKey = key;
-        break;
+    if (window.dadosModalidades) {
+      for (const [key, mod] of Object.entries(window.dadosModalidades)) {
+        const match = (mod.cursos || []).find((c) => c.id === cursoId);
+        if (match) {
+          curso = match;
+          modalidadeKey = key;
+          break;
+        }
       }
     }
 
@@ -352,33 +361,33 @@
       return;
     }
 
-    state.cursoSelecionado = curso;
+    state.cursoSelecionado = { ...curso, modalidadeKey };
 
-    const modal = document.getElementById("modal-secretaria");
-    const modalBadge = document.getElementById("modal-modalidade-badge");
+    const modal = document.getElementById("modal-inscricao");
+    const modalBadge = document.getElementById("modal-modalidade");
     const modalNome = document.getElementById("modal-curso-nome");
     const modalDuracao = document.getElementById("modal-duracao");
-    const modalCarga = document.getElementById("modal-carga-horaria");
+    const modalCarga = document.getElementById("modal-carga");
     const modalArea = document.getElementById("modal-area");
-    const modalDisciplinas = document.getElementById("modal-disciplinas-lista");
+    const modalDisciplinas = document.getElementById("modal-disciplinas");
 
-    const modalidadeInfo = window.MODALIDADES[modalidadeKey];
+    const modalidadeInfo = window.dadosModalidades[modalidadeKey];
 
     if (modalBadge) {
       modalBadge.textContent = modalidadeInfo ? modalidadeInfo.tag : "EAD UniCV";
     }
     if (modalNome) modalNome.textContent = curso.nome;
-    if (modalDuracao) modalDuracao.textContent = `⏱️ Duração: ${curso.duracao}`;
-    if (modalCarga) modalCarga.textContent = `📚 Carga Horária: ${curso.cargaHoraria}`;
+    if (modalDuracao) modalDuracao.innerHTML = `<i class="fa-regular fa-clock mr-1 text-emerald-400"></i> Duração: ${escapeHTML(curso.duracao)}`;
+    if (modalCarga) modalCarga.innerHTML = `<i class="fa-solid fa-book-open mr-1 text-emerald-400"></i> Carga: ${escapeHTML(curso.cargaHoraria)}`;
     if (modalArea) modalArea.textContent = curso.area;
 
-    // Renderiza as 5 disciplinas obrigatórias da grade curricular
+    // Renderiza a lista das 5 disciplinas
     if (modalDisciplinas) {
-      modalDisciplinas.innerHTML = curso.disciplinas
+      modalDisciplinas.innerHTML = (curso.disciplinas || [])
         .map(
           (disc, idx) => `
           <div class="flex items-start gap-2 text-xs text-slate-800">
-            <span class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">
+            <span class="w-4 h-4 rounded-full bg-emerald-100 text-brand-green font-black flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">
               ${idx + 1}
             </span>
             <span class="font-medium">${escapeHTML(disc)}</span>
@@ -388,55 +397,51 @@
         .join("");
     }
 
-    // Configura valor do campo de cidade se já definido por regionalização
+    // Pré-preenche Cidade com foco na Baixada Santista se o parâmetro regional estiver ativo
     const inputCidade = document.getElementById("form-cidade");
     if (inputCidade && state.isRegionalBaixada && !inputCidade.value) {
-      inputCidade.value = state.dadosRegionais.cidadePadrao;
+      inputCidade.value = "Guarujá / Santos e Baixada Santista - SP";
     }
 
-    // Exibe o modal
     if (modal) {
       modal.classList.remove("hidden");
-      document.body.style.overflow = "hidden"; // Trava scroll da página
-      setTimeout(() => {
-        document.getElementById("form-nome")?.focus();
-      }, 100);
+      document.body.style.overflow = "hidden";
+      setTimeout(() => document.getElementById("form-nome")?.focus(), 100);
     }
   }
 
-  function abrirModalGenerico(assunto = "Orientações Acadêmicas") {
+  function abrirModalComAssunto(assunto = "Orientações Acadêmicas") {
     state.cursoSelecionado = {
       id: "atendimento-geral",
       nome: assunto,
-      modalidade: state.modalidadeAtiva,
+      modalidadeKey: state.modalidadeAtiva,
       duracao: "Flexível",
       cargaHoraria: "Conforme o curso",
-      area: "Atendimento Geral",
+      area: "Secretaria Acadêmica",
       disciplinas: [
         "Análise e aproveitamento gratuito de histórico escolar",
         "Apresentação da plataforma virtual AVA UniCV",
-        "Tira-dúvidas de portarias e credenciamento MEC nº 962",
-        "Condições de bolsas e descontos para matrículas abertas",
+        "Credenciamento MEC Portaria nº 962 e Nota Máxima 5",
+        "Condições de bolsas e valores promocionais de matrícula",
         "Orientações para colação de grau e emissão de diploma digital"
       ]
     };
 
-    abrirModalCurso("atendimento-geral");
+    abrirModal("atendimento-geral");
   }
 
   function fecharModal() {
-    const modal = document.getElementById("modal-secretaria");
+    const modal = document.getElementById("modal-inscricao");
     if (modal) {
       modal.classList.add("hidden");
-      document.body.style.overflow = ""; // Destrava scroll
+      document.body.style.overflow = "";
     }
   }
 
   /**
    * 5. INTEGRAÇÃO COM WHATSAPP (API wa.me)
-   * Captura os dados do formulário, valida e gera mensagem estruturada
    */
-  function enviarInscricaoWhatsApp(event) {
+  function enviarWhatsApp(event) {
     if (event) event.preventDefault();
 
     const nome = (document.getElementById("form-nome")?.value || "").trim();
@@ -445,53 +450,52 @@
     const formacao = (document.getElementById("form-formacao")?.value || "").trim();
 
     if (!nome || !whatsapp || !cidade) {
-      alert("Por favor, preencha todos os campos obrigatórios.");
+      alert("Por favor, preencha todos os campos obrigatórios (Nome, WhatsApp e Cidade).");
       return;
     }
 
     const curso = state.cursoSelecionado || {
       nome: "Curso EAD UniCV",
-      modalidade: state.modalidadeAtiva,
-      duracao: "Consultar",
-      cargaHoraria: "Consultar"
+      modalidadeKey: state.modalidadeAtiva,
+      duracao: "A consultar",
+      cargaHoraria: "A consultar"
     };
 
-    const modalidadeInfo = window.MODALIDADES[curso.modalidade] || {
-      nome: "Graduação / Pós-Graduação EAD"
-    };
+    const modalidadeInfo = window.dadosModalidades
+      ? window.dadosModalidades[curso.modalidadeKey]
+      : null;
+    const modalidadeNome = modalidadeInfo ? modalidadeInfo.nome : "Graduação EAD";
 
-    const regiaoNome = state.isRegionalBaixada
+    const regiaoOrigem = state.isRegionalBaixada
       ? "Polo Baixada Santista (Santos / Guarujá e Região)"
-      : "Atendimento Nacional UniCV";
+      : "Atendimento Nacional EduBrasil EAD";
 
-    // Montagem da mensagem estruturada
-    const mensagemLinhas = [
-      "🎓 *SOLICITAÇÃO DE MATRÍCULA E GRADE CURRICULAR - UNICV EAD*",
+    // Formatação profissional e estruturada da mensagem
+    const mensagemTexto = [
+      "🎓 *SOLICITAÇÃO DE MATRÍCULA E GRADE CURRICULAR*",
       "--------------------------------------------------",
+      `*Portal:* EduBrasil EAD (Polo Parceiro Oficial UniCV)`,
+      `*Credenciamento:* Portaria MEC nº 962 (Nota 5)`,
       `*Curso de Interesse:* ${curso.nome}`,
-      `*Modalidade:* ${modalidadeInfo.nome}`,
+      `*Modalidade:* ${modalidadeNome}`,
       `*Duração Estimada:* ${curso.duracao}`,
       `*Carga Horária:* ${curso.cargaHoraria}`,
       "",
       "👤 *DADOS DO CANDIDATO:*",
-      `• *Nome:* ${nome}`,
+      `• *Nome Completo:* ${nome}`,
       `• *WhatsApp:* ${whatsapp}`,
       `• *Cidade / UF:* ${cidade}`,
       `• *Formação Atual:* ${formacao}`,
-      `• *Canal:* ${regiaoNome}`,
+      `• *Canal de Origem:* ${regiaoOrigem}`,
       "--------------------------------------------------",
-      "Olá Secretaria Acadêmica! Gostaria de receber a matriz curricular oficial, verificar as condições especiais de matrícula e o aproveitamento de disciplinas pela Portaria MEC nº 962."
-    ];
+      "Olá! Gostaria de receber a matriz curricular oficial, consultar os valores promocionais e verificar as opções de aproveitamento de disciplinas pela Portaria MEC nº 962."
+    ].join("\n");
 
-    const textoCompleto = mensagemLinhas.join("\n");
-    const textoCodificado = encodeURIComponent(textoCompleto);
+    const textoCodificado = encodeURIComponent(mensagemTexto);
+    const urlWa = `https://wa.me/${WHATSAPP_NUMERO}?text=${textoCodificado}`;
 
-    const numeroWhatsApp = window.INSTITUCIONAL_CONFIG.whatsappOficial || "5513997864321";
-    const waUrl = `https://wa.me/${numeroWhatsApp}?text=${textoCodificado}`;
-
-    // Fecha o modal e abre a conversa do WhatsApp em uma nova aba
     fecharModal();
-    window.open(waUrl, "_blank");
+    window.open(urlWa, "_blank");
   }
 
   /**
@@ -517,36 +521,28 @@
    * 7. BUSCA EM TEMPO REAL
    */
   function setupBusca() {
-    const inputBusca = document.getElementById("input-busca-curso");
+    const inputBusca = document.getElementById("input-busca");
     const btnLimpar = document.getElementById("btn-limpar-busca");
     if (!inputBusca) return;
 
     inputBusca.addEventListener("input", function () {
       state.termoBusca = this.value;
       if (btnLimpar) {
-        if (state.termoBusca.length > 0) {
-          btnLimpar.classList.remove("hidden");
-        } else {
-          btnLimpar.classList.add("hidden");
-        }
+        btnLimpar.classList.toggle("hidden", state.termoBusca.length === 0);
       }
-      renderizarCardsCursos();
+      renderizarCursos();
     });
 
-    if (btnLimpar) {
-      btnLimpar.addEventListener("click", function () {
-        limparBusca();
-      });
-    }
+    btnLimpar?.addEventListener("click", limparBusca);
   }
 
   function limparBusca() {
-    const inputBusca = document.getElementById("input-busca-curso");
+    const inputBusca = document.getElementById("input-busca");
     const btnLimpar = document.getElementById("btn-limpar-busca");
     if (inputBusca) inputBusca.value = "";
     if (btnLimpar) btnLimpar.classList.add("hidden");
     state.termoBusca = "";
-    renderizarCardsCursos();
+    renderizarCursos();
   }
 
   /**
@@ -554,41 +550,38 @@
    */
   function setupTeclado() {
     window.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") {
-        fecharModal();
-      }
+      if (e.key === "Escape") fecharModal();
     });
   }
 
   /**
-   * 9. INICIALIZAÇÃO DA APLICAÇÃO
+   * 9. INICIALIZAÇÃO
    */
   function init() {
     aplicarPersonalizacaoRegional();
     atualizarContadoresAbas();
     atualizarVisualAbas();
-    atualizarBannerModalidade();
-    renderizarCardsCursos();
-    initSimulador();
+    atualizarBoxModalidade();
+    renderizarCursos();
+    inicializarSimulador();
     setupBusca();
     setupMascaraTelefone();
     setupTeclado();
   }
 
-  // Inicializa quando o DOM estiver pronto
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {
     init();
   }
 
-  // Exporta a interface pública para o escopo global
+  // Exporta interface pública para cliques no HTML
   window.appPortal = {
     selecionarModalidade,
-    abrirModalCurso,
-    abrirModalGenerico,
+    abrirModal,
+    abrirModalComAssunto,
     fecharModal,
-    enviarInscricaoWhatsApp,
+    enviarWhatsApp,
     limparBusca
   };
 })();
